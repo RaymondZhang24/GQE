@@ -35,7 +35,7 @@ def parse_args(args=None):
         description='Training and Testing Knowledge Graph Embedding Models',
         usage='train.py [<args>] [-h | --help]'
     )
-
+    parser.add_argument('--cuda', action='store_true', help='use GPU')
     parser.add_argument('-n', '--negative_sample_size', default=128, type=int, help="negative entities sampled per query")
     parser.add_argument('-d', '--hidden_dim', default=500, type=int, help="embedding dimension")
     parser.add_argument('-g', '--gamma', default=12.0, type=float, help="margin in the loss")
@@ -55,7 +55,6 @@ def parse_args(args=None):
     parser.add_argument('--nentity', type=int, default=0, help='DO NOT MANUALLY SET')
     parser.add_argument('--nrelation', type=int, default=0, help='DO NOT MANUALLY SET')
 
-    parser.add_argument('--geo', default='vec', type=str, choices=['vec', 'box', 'beta'], help='the reasoning model, vec for GQE, box for Query2box, beta for BetaE')
     parser.add_argument('--print_on_screen', action='store_true')
 
     parser.add_argument('--seed', default=0, type=int, help="random seed")
@@ -143,11 +142,26 @@ def load_data(args, tasks):
     test_hard_answers = pickle.load(open(os.path.join("FB15k-237-betae", "test-hard-answers.pkl"), 'rb'))
     test_easy_answers = pickle.load(open(os.path.join("FB15k-237-betae", "test-easy-answers.pkl"), 'rb'))
 
-    for name in train_queries:
-        if name not in query_name_dict:
+    remove_structures = [
+            ((('e', ('r',)), ('e', ('r',))), ('r',)),
+            (('e', ('r', 'r')), ('e', ('r',))),
+            (('e', ('r',)), ('e', ('r', 'n'))),
+            (('e', ('r',)), ('e', ('r',)), ('e', ('r', 'n'))),
+            ((('e', ('r',)), ('e', ('r', 'n'))), ('r',)),
+            (('e', ('r', 'r')), ('e', ('r', 'n'))),
+            (('e', ('r', 'r', 'n')), ('e', ('r',))),
+            (('e', ('r',)), ('e', ('r',)), ('u',)),
+            ((('e', ('r',)), ('e', ('r',)), ('u',)), ('r',)),
+            ((('e', ('r', 'n')), ('e', ('r', 'n'))), ('n',)),
+            ((('e', ('r', 'n')), ('e', ('r', 'n'))), ('n', 'r'))
+        ]
+
+    for name in remove_structures:
+        if name in train_queries:
             del train_queries[name]
-            del valid_hard_answers[name]
-            del test_easy_answers[name]
+        if name in valid_queries:
+            del valid_queries[name]
+            del test_queries[name]
 
     return train_queries, train_answers, valid_queries, valid_hard_answers, valid_easy_answers, test_queries, test_hard_answers, test_easy_answers
 
@@ -256,10 +270,7 @@ def main(args):
         nrelation=nrelation,
         hidden_dim=args.hidden_dim,
         gamma=args.gamma,
-        geo=args.geo,
         use_cuda = args.cuda,
-        box_mode=eval_tuple(args.box_mode),
-        beta_mode = eval_tuple(args.beta_mode),
         test_batch_size=args.test_batch_size,
         query_name_dict = query_name_dict
     )
@@ -293,7 +304,6 @@ def main(args):
             warm_up_steps = checkpoint['warm_up_steps']
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     else:
-        logging.info('Ramdomly Initializing %s Model...' % args.geo)
         init_step = 0
 
     step = init_step

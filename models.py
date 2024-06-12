@@ -51,16 +51,14 @@ class Regularizer():
         return torch.clamp(entity_embedding + self.base_add, self.min_val, self.max_val)
 
 class KGReasoning(nn.Module):
-    def __init__(self, nentity, nrelation, hidden_dim, gamma, 
-                 geo, test_batch_size=1,
-                 box_mode=None, use_cuda=False,
-                 query_name_dict=None, beta_mode=None):
+    def __init__(self, nentity, nrelation, hidden_dim, gamma, test_batch_size=1,
+                 use_cuda=False,
+                 query_name_dict=None):
         super(KGReasoning, self).__init__()
         self.nentity = nentity
         self.nrelation = nrelation
         self.hidden_dim = hidden_dim
         self.epsilon = 2.0
-        self.geo = geo
         self.use_cuda = use_cuda
         self.batch_entity_range = torch.arange(nentity).to(torch.float).repeat(test_batch_size, 1).cuda() if self.use_cuda else torch.arange(nentity).to(torch.float).repeat(test_batch_size, 1) # used in test_step
         self.query_name_dict = query_name_dict
@@ -143,10 +141,9 @@ class KGReasoning(nn.Module):
             all_center_embeddings = torch.cat(all_center_embeddings, dim=0).unsqueeze(1)
         
         if type(subsampling_weight) != type(None):
-            subsampling_weight = subsampling_weight[all_idxs+all_union_idxs]
+            subsampling_weight = subsampling_weight[all_idxs]
 
         if type(positive_sample) != type(None):
-
             if len(all_center_embeddings) > 0:
                 positive_sample_regular = positive_sample[all_idxs]
                 positive_embedding = torch.index_select(self.entity_embedding, dim=0, index=positive_sample_regular).unsqueeze(1)
